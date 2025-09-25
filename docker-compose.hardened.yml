@@ -1,0 +1,118 @@
+services:
+  sonarqube:
+    image: sonarqube:${SONARQUBE_VERSION:-latest}
+    container_name: sonarqube
+    depends_on:
+      - db
+    environment:
+      - SONAR_JDBC_URL=jdbc:postgresql://db:5432/sonar
+      - SONAR_JDBC_USERNAME=${SONARQUBE_JDBC_USERNAME:-sonar}
+      - SONAR_JDBC_PASSWORD=${SONARQUBE_JDBC_PASSWORD:-sonar}
+      - SONAR_WEB_JAVAOPTS=-Xmx2G -Xms1G
+      - SONAR_CE_JAVAOPTS=-Xmx2G -Xms1G
+      - SONAR_SEARCH_JAVAOPTS=-Xmx1G -Xms1G
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data:rw
+      - sonarqube_extensions:/opt/sonarqube/extensions:rw
+      - sonarqube_logs:/opt/sonarqube/logs:rw
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "${SONARQUBE_PORT:-9010}:9000"
+    networks:
+      - sonarnet
+    restart: unless-stopped
+    # Security hardening
+    user: "999:999"  # Non-root user
+    read_only: true  # Read-only filesystem
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m
+    security_opt:
+      - no-new-privileges:true
+      - apparmor=docker-sonarqube  # Linux-specific: AppArmor profile
+      - seccomp=/etc/docker/seccomp-profiles/sonarqube-seccomp.json  # Linux-specific: seccomp profile
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - DAC_OVERRIDE
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '2'
+          memory: 2G
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/system/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Recommended for production environments
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+  db:
+    image: postgres:13
+    container_name: sonarqube_db
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-sonar}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-sonar}
+      - POSTGRES_DB=${POSTGRES_DB:-sonar}
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data:rw
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - sonarnet
+    restart: unless-stopped
+    # Security hardening
+    user: postgres
+    read_only: false  # Database needs write access
+    security_opt:
+      - no-new-privileges:true
+      - apparmor=docker-postgres  # Linux-specific: AppArmor profile
+      - seccomp=/etc/docker/seccomp-profiles/postgres-seccomp.json  # Linux-specific: seccomp profile
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sonar}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  sonarnet:
+    driver: bridge
+    # Network security
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+    # Restrict external access
+    internal: false  # Set to true if you don't need external access
+
+volumes:
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:
+  postgresql_data:

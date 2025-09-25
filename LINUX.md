@@ -108,3 +108,37 @@ If SonarQube fails to start due to memory issues:
 1. For production environments, always change default passwords
 2. Consider setting up HTTPS with a reverse proxy (like Nginx or Traefik)
 3. Apply the security hardening configurations from `security-hardening.env`
+4. Implement Docker security hardening measures (see below)
+
+## Docker Security Hardening
+
+This project includes comprehensive Docker security hardening for Linux environments:
+
+### Quick Setup
+
+1. Set up Linux-specific security features:
+   ```bash
+   sudo ./setup-linux-security.sh
+   ```
+
+2. Apply Docker hardening measures:
+   ```bash
+   sudo ./apply-docker-hardening.sh
+   ```
+
+3. Start SonarQube with hardened configuration:
+   ```bash
+   docker-compose -f docker-compose.hardened.yml up -d
+   ```
+
+### Security Features
+
+The Linux Docker hardening implementation includes:
+
+1. **AppArmor Profiles**: Mandatory Access Control for containers
+2. **Seccomp Profiles**: System call filtering for containers
+3. **Docker Daemon Hardening**: Security configurations for the Docker daemon
+4. **Audit Logging**: Monitoring Docker-related activities
+5. **Container Hardening**: Non-root users, read-only filesystems, capability restrictions
+
+For detailed information, see [LINUX-DOCKER-HARDENING.md](LINUX-DOCKER-HARDENING.md).
